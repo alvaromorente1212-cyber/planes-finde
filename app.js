@@ -537,9 +537,9 @@
     map = L.map("map", { zoomControl: false, attributionControl: true }).setView([CFG.origen.lat, CFG.origen.lng], 9);
     L.control.zoom({ position: "bottomright" }).addTo(map);
     map.attributionControl.setPrefix('<a href="https://leafletjs.com">Leaflet</a>');
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png", {
-      maxZoom: 19, subdomains: "abcd",
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>',
+    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      maxZoom: 19,
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
     }).addTo(map);
     L.marker([CFG.origen.lat, CFG.origen.lng], {
       icon: L.divIcon({ className: "", html: '<div class="pin-origin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
