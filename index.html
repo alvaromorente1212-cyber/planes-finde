@@ -15,7 +15,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
-  <link rel="stylesheet" href="styles.css?v=3">
+  <link rel="stylesheet" href="vendor/leaflet/MarkerCluster.css">
+  <link rel="stylesheet" href="styles.css?v=5">
 </head>
 <body>
   <header class="top">
@@ -91,7 +92,7 @@
     <form method="dialog" id="nameForm">
       <h2>¿Quién eres?</h2>
       <p>Tu nombre aparece en las opiniones para que el grupo sepa quién ha ido.</p>
-      <input id="nameInput" name="name" maxlength="40" autocomplete="name" placeholder="Ej.: Álvaro Morente" required>
+      <input id="nameInput" name="name" minlength="2" maxlength="40" autocomplete="name" placeholder="Ej.: Álvaro Morente" required>
       <div class="dialog-actions">
         <button type="submit" class="btn btn-primary">Guardar</button>
       </div>
@@ -102,7 +103,8 @@
 
   <script src="vendor/supabase.js"></script>
   <script src="vendor/leaflet/leaflet.js"></script>
+  <script src="vendor/leaflet/leaflet.markercluster.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

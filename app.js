@@ -31,6 +31,7 @@
     const n = s.map((d) => DIAS_PL[d - 1]);
     return n.length > 1 ? `${n.slice(0, -1).join(", ")} y ${n[n.length - 1]}` : n[0];
   }
+  const safeUrl = (u) => (/^https?:\/\//i.test(u || "") ? u : null);
   const shortDate = (k) => { const d = fromKey(k); return `${d.getDate()} ${MES_C[d.getMonth()]}`; };
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const TODAY = keyOf(today);
@@ -74,6 +75,7 @@
     reviews: [],
     revByPlan: {},
     weather: {},
+    weatherOk: false,
     ages: store.get("pf_ages", []),
     filters: new Set(),
     date: null,
@@ -84,6 +86,7 @@
     mapMode: "dia",
     showAllPerm: false,
     feedPerson: null,
+    loaded: false,
   };
 
   function defaultDate() {
@@ -180,6 +183,7 @@
           prob: j.daily.precipitation_probability_max[i] ?? 0,
         };
       });
+      state.weatherOk = true;
     } catch { /* sin previsión: la app funciona igual */ }
   }
   function wxIcon(code) {
@@ -289,7 +293,7 @@
           <div class="wx-detail">${wxText(w.code)} en Rivas, ${w.prob}% de probabilidad de lluvia</div></div>
         </div>${tip ? `<div class="wx-tip">${tip}</div>` : ""}`;
     } else {
-      wx = `<div class="wx-tip">La previsión del tiempo aparece cuando falten menos de 16 días.</div>`;
+      wx = `<div class="wx-tip">${state.weatherOk ? "La previsión del tiempo aparece cuando falten menos de 16 días." : "No se ha podido cargar la previsión del tiempo."}</div>`;
     }
     el.innerHTML = `
       <div class="day-name">${DIAS[dow - 1]} ${d.getDate()}</div>
@@ -315,7 +319,12 @@
     const a = avg(p.id);
     const names = [...new Set(r.map((x) => x.autor.split(" ")[0]))];
     const who = names.length <= 2 ? names.join(" y ") : `${names.slice(0, 2).join(", ")} y ${names.length - 2} más`;
-    return `<div class="card-rev"><span class="score">${a}</span><span>${esc(who)} ${r.length === 1 && names.length === 1 ? "ya ha ido" : "ya han ido"}</span></div>`;
+    return `<div class="card-rev"><span class="score">${a}</span><span>${esc(who)} ${names.length === 1 ? "ya ha ido" : "ya han ido"}</span></div>`;
+  }
+  function ageShort(p) {
+    if (p.edad_min === 0 && p.edad_max >= 12) return "Todas las edades";
+    if (p.edad_min === 0) return `Hasta ${p.edad_max} años`;
+    return `${p.edad_min}–${p.edad_max}${p.edad_max >= 12 ? "+" : ""} años`;
   }
   function card(p, k) {
     const c = cat(p);
@@ -324,7 +333,7 @@
       whenTag(p, k),
       p.gratis ? `<span class="tag free">Gratis</span>` : "",
       rainy ? `<span class="tag rain">Al aire libre</span>` : p.entorno === "interior" ? `<span class="tag">A cubierto</span>` : "",
-      `<span class="tag">${p.edad_min === 0 ? "Desde bebés" : `${p.edad_min}–${p.edad_max}${p.edad_max >= 12 ? "+" : ""} años`}</span>`,
+      `<span class="tag">${ageShort(p)}</span>`,
       p.reserva ? `<span class="tag warn">Reserva</span>` : "",
     ].join("");
     return `<button type="button" class="card ${p.tipo}" data-plan="${p.id}">
@@ -367,25 +376,49 @@
 
   // ---------- Ficha del plan ----------
   let lastFocus = null;
-  function openPlan(id, pushHash = true) {
+  function openPlan(id, fromHistory = false) {
+    if (!state.loaded) return; // al terminar la carga se abre el plan del enlace
     const p = state.plans.find((x) => x.id === id || x.slug === id);
-    if (!p) return;
-    lastFocus = document.activeElement;
+    if (!p) {
+      toast("Ese plan ya no está disponible");
+      if (location.hash) history.replaceState(null, "", location.pathname + location.search);
+      return;
+    }
+    const wasOpen = !$("#sheet").hidden;
+    if (!wasOpen) lastFocus = document.activeElement;
     if (map) map.closePopup();
     renderSheet(p);
     $("#sheetBackdrop").hidden = false;
     $("#sheet").hidden = false;
+    $("#sheetBody").scrollTop = 0;
     document.body.style.overflow = "hidden";
-    $("#sheetClose").focus({ preventScroll: true });
-    if (pushHash) history.replaceState(null, "", `#plan=${p.slug}`);
+    if (!wasOpen) $("#sheetClose").focus({ preventScroll: true });
+    if (!fromHistory) {
+      const url = `${location.pathname}${location.search}#plan=${p.slug}`;
+      if (wasOpen && history.state && history.state.pfSheet) history.replaceState({ pfSheet: true }, "", url);
+      else history.pushState({ pfSheet: true }, "", url);
+    }
   }
-  function closePlan() {
+  function hideSheet() {
+    if ($("#sheet").hidden) return;
     $("#sheet").hidden = true;
     $("#sheetBackdrop").hidden = true;
     document.body.style.overflow = "";
-    history.replaceState(null, "", location.pathname + location.search);
-    if (lastFocus) lastFocus.focus({ preventScroll: true });
+    if (lastFocus && document.contains(lastFocus)) lastFocus.focus({ preventScroll: true });
   }
+  function closePlan() {
+    if (history.state && history.state.pfSheet) { history.back(); return; } // popstate la cierra
+    hideSheet();
+    history.replaceState(null, "", location.pathname + location.search);
+  }
+  window.addEventListener("popstate", () => {
+    const m = location.hash.match(/plan=([\w-]+)/);
+    if (m) openPlan(m[1], true); else hideSheet();
+  });
+  window.addEventListener("hashchange", () => {
+    const m = location.hash.match(/plan=([\w-]+)/);
+    if (m) openPlan(m[1], true);
+  });
   function dirUrl(p) {
     if (p.lat != null && !p.ubicacion_aprox) return `https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}`;
     return `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(`${p.titulo.split(":")[0]}, ${p.direccion || p.municipio || ""}`)}`;
@@ -427,7 +460,7 @@
         </div>
       </div>
       <div class="facts">
-        <div class="fact"><span>📅</span><span>${when}${whenDays}${p.horario ? `<br><small>${esc(p.horario)}</small>` : ""}</span></div>
+        <div class="fact"><span>🕑</span><span>${when}${whenDays}${p.horario ? `<br><small>${esc(p.horario)}</small>` : ""}</span></div>
         <div class="fact"><span>👶</span><span>${ageTxt}</span></div>
         <div class="fact"><span>💶</span><span>${esc(p.precio || (p.gratis ? "Gratis" : "Consultar"))}</span></div>
         <div class="fact"><span>${p.entorno === "exterior" ? "🌤️" : "🏠"}</span><span>${env}</span></div>
@@ -438,7 +471,7 @@
       ${p.descripcion ? `<p class="sheet-desc">${esc(p.descripcion)}</p>` : ""}
       <div class="actions">
         <a class="btn btn-primary" href="${dirUrl(p)}" target="_blank" rel="noopener">Cómo llegar</a>
-        ${p.url ? `<a class="btn" href="${esc(p.url)}" target="_blank" rel="noopener">Ver la web</a>`
+        ${safeUrl(p.url) ? `<a class="btn" href="${esc(safeUrl(p.url))}" target="_blank" rel="noopener">Ver la web</a>`
           : `<a class="btn" href="https://www.google.com/search?q=${encodeURIComponent(p.titulo + " " + (p.municipio || ""))}" target="_blank" rel="noopener">Buscar en Google</a>`}
         <button type="button" class="btn btn-ghost" data-share="${p.slug}">Compartir</button>
         <button type="button" class="btn btn-ghost" data-showmap="${p.id}">Ver en el mapa</button>
@@ -448,7 +481,7 @@
       ${revs.length ? revs.map((r) => reviewHtml(r, false)).join("") : `<div class="empty"><strong>Nadie ha ido todavía</strong>Si vais, contad qué tal para el resto.</div>`}
 
       <h3 class="section-title">¿Habéis ido?</h3>
-      <form class="rate-form" id="rateForm" data-plan="${p.id}">
+      <form class="rate-form" id="rateForm" data-plan="${p.id}" novalidate>
         <label id="lblNota">Nota del 0 al 10</label>
         <div class="scale" role="group" aria-labelledby="lblNota">
           ${Array.from({ length: 11 }, (_, i) => `<button type="button" data-nota="${i}" aria-pressed="false">${i}</button>`).join("")}
@@ -467,7 +500,12 @@
   async function submitReview(form) {
     const nota = form.dataset.nota;
     if (nota === undefined) { toast("Elige una nota del 0 al 10"); return; }
-    if (!state.name) { await askName(); if (!state.name) return; }
+    const fv = $("#rDate").value;
+    if (fv && fv > TODAY) { toast("La fecha de la visita no puede ser futura"); return; }
+    if (!state.name) {
+      await askName();
+      if (!state.name) { toast("Pon tu nombre para publicar la opinión"); return; }
+    }
     const btn = form.querySelector('button[type="submit"]');
     btn.disabled = true;
     const token = crypto.getRandomValues(new Uint32Array(4)).reduce((s, n) => s + n.toString(16).padStart(8, "0"), "");
@@ -546,12 +584,25 @@
       icon: L.divIcon({ className: "", html: '<div class="pin-origin"></div>', iconSize: [18, 18], iconAnchor: [9, 9] }),
       title: "Rivas (punto de partida)",
     }).addTo(map).bindTooltip("Casa (Rivas)");
-    layer = L.layerGroup().addTo(map);
+    layer = L.markerClusterGroup({
+      showCoverageOnHover: false,
+      maxClusterRadius: 44,
+      spiderfyDistanceMultiplier: 1.6,
+      iconCreateFunction: (c) => L.divIcon({
+        className: "",
+        html: `<div class="cluster"><span>${c.getChildCount()}</span></div>`,
+        iconSize: [42, 42], iconAnchor: [21, 21],
+      }),
+    }).addTo(map);
   }
   function renderMap(focusId) {
     initMap();
     const k = state.date;
     const list = state.mapMode === "dia" ? plansFor(k) : state.plans.filter((p) => ageOk(p) && filtersOk(p));
+    if (focusId && !list.some((p) => p.id === focusId)) {
+      const fp = state.plans.find((p) => p.id === focusId);
+      if (fp) list.push(fp);
+    }
     $("#mapDay").textContent = state.mapMode === "dia" ? `${DIAS[isoDow(fromKey(k)) - 1]} ${fromKey(k).getDate()} de ${MESES[fromKey(k).getMonth()]}, ${list.length} planes` : `${list.length} planes`;
     layer.clearLayers();
     const bounds = [];
@@ -567,7 +618,7 @@
       const a = avg(p.id);
       const revHtml = revs.slice(0, 2).map((r) => `<p><strong>${esc(r.autor)}</strong> ${r.nota}/10${r.comentario ? `: ${esc(r.comentario.length > 90 ? r.comentario.slice(0, 90) + "…" : r.comentario)}` : ""}</p>`).join("");
       const html = `<p class="pop-title">${esc(p.titulo)}</p>
-        <p class="pop-place">${esc(p.municipio || "")}${p._km != null ? `, a ${p._km} km` : ""}${p.tipo === "temporal" ? `<br>Hasta el ${shortDate(p.fecha_fin)}` : ""}</p>
+        <p class="pop-place">${esc(p.municipio || "")}${p._km != null ? `, a ${p._km} km` : ""}${p.tipo === "temporal" ? `<br>Hasta el ${shortDate(p.fecha_fin)}` : ""}${p.ubicacion_aprox ? `<br><small>Ubicación aproximada</small>` : ""}</p>
         ${revs.length ? `<div class="pop-rev"><p><span class="score">${a}</span> ${revs.length} ${revs.length === 1 ? "opinión" : "opiniones"}</p>${revHtml}</div>` : ""}
         <button type="button" class="btn btn-primary pop-btn" data-plan="${p.id}">Ver plan</button>`;
       const mk = L.marker([p.lat, p.lng], { icon, title: p.titulo }).bindPopup(html, { maxWidth: 260 });
@@ -577,7 +628,7 @@
     }
     setTimeout(() => {
       map.invalidateSize();
-      if (focusMarker) { map.setView(focusMarker.getLatLng(), 13); focusMarker.openPopup(); }
+      if (focusMarker) layer.zoomToShowLayer(focusMarker, () => focusMarker.openPopup());
       else if (bounds.length) map.fitBounds([[CFG.origen.lat, CFG.origen.lng], ...bounds], { padding: [30, 30], maxZoom: 12 });
     }, 50);
   }
@@ -585,6 +636,7 @@
   // ---------- Opiniones ----------
   function renderFeed() {
     const people = [...new Set(state.reviews.map((r) => r.autor))].sort((a, b) => a.localeCompare(b, "es"));
+    if (state.feedPerson && !people.includes(state.feedPerson)) state.feedPerson = null;
     $("#peopleFilter").innerHTML = people.length
       ? [`<button type="button" class="chip" data-person="" aria-pressed="${!state.feedPerson}">Todos</button>`,
          ...people.map((n) => `<button type="button" class="chip" data-person="${esc(n)}" aria-pressed="${state.feedPerson === n}">${esc(n)}</button>`)].join("")
@@ -663,7 +715,8 @@
       const url = `${location.origin}${location.pathname}#plan=${t.dataset.share}`;
       const p = state.plans.find((x) => x.slug === t.dataset.share);
       if (navigator.share) navigator.share({ title: p?.titulo, text: `Mira este plan: ${p?.titulo}`, url }).catch(() => {});
-      else navigator.clipboard?.writeText(url).then(() => toast("Enlace copiado"));
+      else if (navigator.clipboard) navigator.clipboard.writeText(url).then(() => toast("Enlace copiado"), () => prompt("Copia el enlace:", url));
+      else prompt("Copia el enlace:", url);
     } else if (t.dataset.showmap) {
       const id = t.dataset.showmap;
       closePlan();
@@ -677,7 +730,7 @@
   });
   $("#sheetClose").addEventListener("click", closePlan);
   $("#sheetBackdrop").addEventListener("click", closePlan);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet").hidden) closePlan(); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && !$("#sheet").hidden && !$("#nameDialog").open) closePlan(); });
   $("#whoBtn").addEventListener("click", () => askName());
   // Deslizar hacia abajo para cerrar la ficha
   (() => {
@@ -698,9 +751,14 @@
       console.error(err);
       return;
     }
-    renderPlanes();
+    state.loaded = true;
+    refreshAll();
     const m = location.hash.match(/plan=([\w-]+)/);
-    if (m) openPlan(m[1], false);
+    if (m) {
+      // Deja una entrada "sin ficha" debajo para que Atrás cierre la ficha
+      history.replaceState(null, "", location.pathname + location.search);
+      openPlan(m[1]);
+    }
   }
   start();
 })();

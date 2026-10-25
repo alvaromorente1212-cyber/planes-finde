@@ -24,7 +24,7 @@ STEP 3 — Add permanent plans (tipo = 'permanente')
 Add 3-6 NEW permanent plans per week that are not in the table yet, verified the same way. Priorities: restaurants where kids can see a farm/animals or have supervised play while parents eat; granjas escuela open to families at weekends; singular free playgrounds; nature walks suitable for a pushchair; museums or indoor spaces good for rainy days; zoos/aquariums/animal sanctuaries. If you confirm that an existing permanent plan has closed for good, set activo = false for it (update public.pf_planes set activo = false, actualizado = now() where slug = '...').
 
 STEP 4 — Field rules for every row
-- slug: lowercase-with-hyphens, unique. Temporary plans end with the year (e.g. 'mercado-medieval-alcala-2026').
+- slug: unique, ASCII only: lowercase letters a-z, digits and single hyphens (no accents, no ñ, no spaces; write 'n' for 'ñ'). Temporary plans end with the year (e.g. 'mercado-medieval-alcala-2026').
 - titulo: short and clear. descripcion: 1-3 sentences in your own words (no copied text), useful for parents (what kids do, tips).
 - tipo: 'temporal' (needs fecha_inicio and fecha_fin, YYYY-MM-DD, fecha_fin >= fecha_inicio) or 'permanente' (fechas null).
 - categoria: EXACTLY one of granja, zoo, restaurante, parque, naturaleza, museo, cubierto, espectaculo, fiesta, feria, taller, evento.
@@ -34,13 +34,14 @@ STEP 4 — Field rules for every row
 - entorno: 'interior', 'exterior' or 'mixto' (important: the app pushes outdoor plans down on rainy days).
 - municipio, direccion: as precise as the source allows.
 - lat, lng: coordinates of the venue. Use exact coordinates when you can determine them from a reliable source; otherwise use the best approximation of the town/district and set ubicacion_aprox = true. Must be within ~150 km of Rivas (40.358, -3.532).
-- url: official or source page you fetched. fuente: publisher name. reserva: true if booking/registration is needed.
+- url: must start with http:// or https://; the official or source page you fetched. fuente: publisher name. reserva: true if booking/registration is needed.
 
 STEP 5 — Save
 - Upsert in one or a few statements with execute_sql:
   insert into public.pf_planes (slug, titulo, descripcion, tipo, categoria, fecha_inicio, fecha_fin, dias_semana, horario, edad_min, edad_max, entorno, precio, gratis, municipio, direccion, lat, lng, url, fuente, ubicacion_aprox, reserva) values (...), (...)
   on conflict (slug) do update set titulo = excluded.titulo, descripcion = excluded.descripcion, tipo = excluded.tipo, categoria = excluded.categoria, fecha_inicio = excluded.fecha_inicio, fecha_fin = excluded.fecha_fin, dias_semana = excluded.dias_semana, horario = excluded.horario, edad_min = excluded.edad_min, edad_max = excluded.edad_max, entorno = excluded.entorno, precio = excluded.precio, gratis = excluded.gratis, municipio = excluded.municipio, direccion = excluded.direccion, lat = excluded.lat, lng = excluded.lng, url = excluded.url, fuente = excluded.fuente, ubicacion_aprox = excluded.ubicacion_aprox, reserva = excluded.reserva, activo = true, actualizado = now();
   Escape single quotes by doubling them. Write int arrays as array[6,7]::int[] and nulls as null.
+- The table has check constraints (allowed categories, edad_min <= edad_max, weekdays 1-7, url format, coordinates inside central Spain, slug format). If an insert fails with a constraint error, fix that row and retry; never drop a whole batch because of one row.
 - Do not delete rows. Past temporary plans are hidden automatically by the app.
 - Verify: select tipo, count(*) from public.pf_planes where activo and (tipo = 'permanente' or fecha_fin >= 'D') group by tipo; and select slug, fecha_inicio, fecha_fin from public.pf_planes where tipo = 'temporal' and fecha_fin >= 'D' order by fecha_inicio;
 
