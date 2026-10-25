@@ -371,6 +371,7 @@
     const p = state.plans.find((x) => x.id === id || x.slug === id);
     if (!p) return;
     lastFocus = document.activeElement;
+    if (map) map.closePopup();
     renderSheet(p);
     $("#sheetBackdrop").hidden = false;
     $("#sheet").hidden = false;
