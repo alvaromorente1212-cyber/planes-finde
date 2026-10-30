@@ -334,3 +334,7 @@ main { max-width: 720px; margin: 0 auto; padding: 0 16px; }
 .tag.stroller.si { background: var(--park-tint); color: var(--park-deep); }
 .tag.stroller.dificil { background: var(--slide-tint); color: var(--slide-ink); }
 .tag.stroller.no { background: #FBE6E2; color: var(--danger); }
+.tag.play { background: #EDE7FB; color: #4B3A8C; }
+.map-ages { margin-top: 10px; }
+.map-ages .age { min-width: 46px; padding: 6px 4px; }
+.map-filters { padding-top: 6px; padding-bottom: 10px; }

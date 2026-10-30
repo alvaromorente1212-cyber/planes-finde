@@ -66,13 +66,22 @@
     dificil: { tag: "Carrito todoterreno", txt: "Solo con carrito de ruedas grandes o todoterreno; algún tramo complicado" },
     no: { tag: "Sin carrito", txt: "Sin carrito: mejor mochila portabebés o peques que ya caminen" },
   };
+  const COMER = {
+    monitores: { tag: "Con monitores", txt: "Mientras coméis, hay monitores o animación que se ocupan de los peques" },
+    parque: { tag: "Parque infantil", txt: "Tiene parque de bolas o zona de juegos a la vista mientras coméis" },
+    animales: { tag: "Con animales", txt: "Los peques ven animales o una granja mientras coméis" },
+    espacio_libre: { tag: "Espacio para correr", txt: "Recinto o jardín donde los peques corren a sus anchas mientras coméis" },
+  };
+  const isComer = (p) => p.categoria === "restaurante" || !!p.comer_jugando;
   const kmTxt = (n) => `${String(Number(n)).replace(".", ",")} km`;
 
   const FILTERS = [
     { id: "gratis", label: "Gratis", test: (p) => p.gratis },
     { id: "cubierto", label: "A cubierto", test: (p) => p.entorno !== "exterior" },
     { id: "animales", label: "Con animales", test: (p) => ["granja", "zoo"].includes(p.categoria) || /granja|animal/i.test(p.descripcion || "") },
-    { id: "comer", label: "Para comer", test: (p) => p.categoria === "restaurante" },
+    { id: "comer", label: "Para comer", test: (p) => isComer(p) },
+    { id: "comerjuego", label: "Comer mientras juegan", test: (p) => !!p.comer_jugando },
+    { id: "monitores", label: "Con monitores", test: (p) => p.comer_jugando === "monitores" },
     { id: "rutas", label: "Rutas y paseos", test: (p) => isRuta(p) },
     { id: "carrito", label: "Con carrito", test: (p) => p.carrito === "si" },
     { id: "sincarrito", label: "Sin carrito", test: (p) => p.carrito === "no" },
@@ -97,6 +106,7 @@
     mapMode: "dia",
     showAllPerm: false,
     showAllRutas: false,
+    showAllComer: false,
     feedPerson: null,
     loaded: false,
   };
@@ -223,14 +233,14 @@
 
   // ---------- Render: edades ----------
   function renderAges() {
-    const el = $("#ages");
     const opts = [0, 1, 2, 3, 4, 5, 6];
-    el.innerHTML = opts.map((a) => {
+    const html = opts.map((a) => {
       const on = state.ages.includes(a);
       const lab = a === 0 ? "bebé" : a === 6 ? "o más" : a === 1 ? "año" : "años";
       const txt = a === 6 ? "6+" : String(a);
       return `<button type="button" class="age" data-age="${a}" aria-pressed="${on}" aria-label="${a === 0 ? "Menos de 1 año" : a + " años"}">${txt}<small>${lab}</small></button>`;
     }).join("");
+    document.querySelectorAll("[data-ages]").forEach((el) => { el.innerHTML = html; });
     const hint = $("#agesHint");
     if (!state.ages.length) hint.textContent = "Elige una o varias edades. Si tienes dos peques, marca las dos.";
     else {
@@ -315,7 +325,8 @@
 
   // ---------- Render: filtros ----------
   function renderFilters() {
-    $("#filters").innerHTML = FILTERS.map((f) => `<button type="button" class="chip" data-filter="${f.id}" aria-pressed="${state.filters.has(f.id)}">${f.label}</button>`).join("");
+    const html = FILTERS.map((f) => `<button type="button" class="chip" data-filter="${f.id}" aria-pressed="${state.filters.has(f.id)}">${f.label}</button>`).join("");
+    document.querySelectorAll("[data-filters]").forEach((el) => { el.innerHTML = html; });
   }
 
   // ---------- Render: tarjetas ----------
@@ -345,6 +356,7 @@
       whenTag(p, k),
       p.gratis ? `<span class="tag free">Gratis</span>` : "",
       rainy ? `<span class="tag rain">Al aire libre</span>` : p.entorno === "interior" ? `<span class="tag">A cubierto</span>` : "",
+      p.comer_jugando ? `<span class="tag play">${COMER[p.comer_jugando].tag}</span>` : "",
       p.carrito ? `<span class="tag stroller ${p.carrito}">${CARRITO[p.carrito].tag}</span>` : "",
       p.distancia_km ? `<span class="tag">${kmTxt(p.distancia_km)}</span>` : "",
       isRuta(p) ? "" : `<span class="tag">${ageShort(p)}</span>`,
@@ -365,7 +377,9 @@
     const k = state.date;
     const all = plansFor(k);
     const temp = sortPlans(all.filter((p) => p.tipo === "temporal"), k);
-    const perm = sortPlans(all.filter((p) => p.tipo === "permanente" && !isRuta(p)), k);
+    const perm = sortPlans(all.filter((p) => p.tipo === "permanente" && !isRuta(p) && !isComer(p)), k);
+    const comer = sortPlans(all.filter((p) => p.tipo === "permanente" && isComer(p)), k);
+    const comerShown = state.showAllComer ? comer : comer.slice(0, 10);
     const rutas = sortPlans(all.filter((p) => p.tipo === "permanente" && isRuta(p)), k);
     const LIMIT = 10;
     const permShown = state.showAllPerm ? perm : perm.slice(0, LIMIT);
@@ -376,9 +390,13 @@
       <p class="list-sub">Ferias, fiestas y espectáculos con fecha de fin.</p>
       <div class="cards">${temp.length ? temp.map((p) => card(p, k)).join("") : `<div class="empty"><strong>No hay planes de temporada este día</strong>Cada lunes se cargan los de los dos findes siguientes.</div>`}</div>
       <div class="list-head"><h2>Cualquier finde</h2><span class="count">${perm.length}</span></div>
-      <p class="list-sub">Granjas, parques, museos y sitios para comer que están siempre.</p>
+      <p class="list-sub">Granjas, parques, museos, parques de bolas y sitios cubiertos que están siempre.</p>
       <div class="cards">${perm.length ? permShown.map((p) => card(p, k)).join("") : noMatch}</div>
       ${perm.length > LIMIT && !state.showAllPerm ? `<button type="button" class="btn more-btn" data-more="perm">Ver ${perm.length - LIMIT} más</button>` : ""}
+      <div class="list-head"><h2>Comer con peques</h2><span class="count">${comer.length}</span></div>
+      <p class="list-sub">Restaurantes donde los peques juegan mientras coméis: con monitores, parque de bolas, animales o espacio para correr.</p>
+      <div class="cards">${comer.length ? comerShown.map((p) => card(p, k)).join("") : noMatch}</div>
+      ${comer.length > 10 && !state.showAllComer ? `<button type="button" class="btn more-btn" data-more="comer">Ver ${comer.length - 10} más</button>` : ""}
       <div class="list-head"><h2>Rutas y paseos</h2><span class="count">${rutas.length}</span></div>
       <p class="list-sub">Con carrito, con carrito todoterreno o con mochila. Usa los filtros de arriba para ver solo las de carrito.</p>
       <div class="cards">${rutas.length ? rutasShown.map((p) => card(p, k)).join("") : noMatch}</div>
@@ -484,6 +502,7 @@
         <div class="fact"><span>👶</span><span>${ageTxt}</span></div>
         <div class="fact"><span>💶</span><span>${esc(p.precio || (p.gratis ? "Gratis" : "Consultar"))}</span></div>
         <div class="fact"><span>${p.entorno === "exterior" ? "🌤️" : "🏠"}</span><span>${env}</span></div>
+        ${p.comer_jugando ? `<div class="fact"><span>🍽️</span><span>${COMER[p.comer_jugando].txt}</span></div>` : ""}
         ${p.carrito ? `<div class="fact"><span>${p.carrito === "no" ? "🎒" : "🚼"}</span><span>${CARRITO[p.carrito].txt}</span></div>` : ""}
         ${p.distancia_km ? `<div class="fact"><span>🥾</span><span>Recorrido de ${kmTxt(p.distancia_km)}</span></div>` : ""}
         ${p.reserva ? `<div class="fact"><span>🎟️</span><span>Hay que reservar antes</span></div>` : ""}
@@ -701,11 +720,12 @@
       const a = Number(t.dataset.age);
       state.ages = state.ages.includes(a) ? state.ages.filter((x) => x !== a) : [...state.ages, a];
       store.set("pf_ages", state.ages);
-      state.showAllPerm = false; state.showAllRutas = false;
+      state.showAllPerm = false; state.showAllRutas = false; state.showAllComer = false;
       renderPlanes();
+      if (state.tab === "mapa") renderMap();
     } else if (t.dataset.date) {
       state.date = t.dataset.date;
-      state.showAllPerm = false; state.showAllRutas = false;
+      state.showAllPerm = false; state.showAllRutas = false; state.showAllComer = false;
       renderCalendar(); renderDayHead(); renderLists();
       $("#dayHead").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     } else if (t.dataset.cal) {
@@ -715,8 +735,11 @@
       const f = t.dataset.filter;
       state.filters.has(f) ? state.filters.delete(f) : state.filters.add(f);
       renderFilters(); renderLists();
+      if (state.tab === "mapa") renderMap();
     } else if (t.dataset.more !== undefined) {
-      if (t.dataset.more === "rutas") state.showAllRutas = true; else state.showAllPerm = true;
+      if (t.dataset.more === "rutas") state.showAllRutas = true;
+      else if (t.dataset.more === "comer") state.showAllComer = true;
+      else state.showAllPerm = true;
       renderLists();
     } else if (t.dataset.plan && !t.closest("form")) {
       openPlan(t.dataset.plan);
