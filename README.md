@@ -19,6 +19,6 @@ Librerías servidas desde `vendor/`: Leaflet 1.9.4 y supabase-js 2.
 
 ## Datos
 
-- `pf_planes`: `tipo` = `temporal` (con `fecha_inicio`/`fecha_fin`) o `permanente`. `dias_semana` (1=lunes … 7=domingo; null = todos). Los festivos de `config.js` cuentan como domingo. `edad_min`/`edad_max`, `entorno` (interior/exterior/mixto), `ubicacion_aprox` si las coordenadas son aproximadas.
+- `pf_planes`: `tipo` = `temporal` (con `fecha_inicio`/`fecha_fin`) o `permanente`. `dias_semana` (1=lunes … 7=domingo; null = todos). Los festivos de `config.js` cuentan como domingo. `edad_min`/`edad_max`, `entorno` (interior/exterior/mixto), `ubicacion_aprox` si las coordenadas son aproximadas. Las rutas (`categoria` = `ruta`) llevan `carrito` (`si` / `dificil` / `no`) y `distancia_km`; la app las muestra en su propia sección *Rutas y paseos* y tiene filtros *Rutas y paseos*, *Con carrito* y *Sin carrito*.
 - `pf_valoraciones`: nombre, nota 0-10, comentario. Cualquiera con el enlace puede leer y escribir; cada persona puede borrar solo lo suyo desde el mismo navegador (token guardado en local).
 - `supabase/seed.py` genera la carga inicial (`seed.sql`) con upsert por `slug`.

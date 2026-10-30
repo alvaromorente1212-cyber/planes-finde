@@ -21,13 +21,15 @@ Rules:
 - Aim for 12-25 temporary plans in the window (quality over quantity). Plans already in the table whose data is still right need no change; update them if dates/times changed.
 
 STEP 3 — Add permanent plans (tipo = 'permanente')
-Add 3-6 NEW permanent plans per week that are not in the table yet, verified the same way. Priorities: restaurants where kids can see a farm/animals or have supervised play while parents eat; granjas escuela open to families at weekends; singular free playgrounds; nature walks suitable for a pushchair; museums or indoor spaces good for rainy days; zoos/aquariums/animal sanctuaries. If you confirm that an existing permanent plan has closed for good, set activo = false for it (update public.pf_planes set activo = false, actualizado = now() where slug = '...').
+Add 3-6 NEW permanent plans per week that are not in the table yet, verified the same way, and 2-4 NEW family walking routes (categoria 'ruta', tipo 'permanente', entorno 'exterior'), mixing pushchair-friendly ones and ones for a baby carrier, within ~1h30 of Rivas. Priorities: restaurants where kids can see a farm/animals or have supervised play while parents eat; granjas escuela open to families at weekends; singular free playgrounds; nature walks suitable for a pushchair; museums or indoor spaces good for rainy days; zoos/aquariums/animal sanctuaries. If you confirm that an existing permanent plan has closed for good, set activo = false for it (update public.pf_planes set activo = false, actualizado = now() where slug = '...').
 
 STEP 4 — Field rules for every row
 - slug: unique, ASCII only: lowercase letters a-z, digits and single hyphens (no accents, no ñ, no spaces; write 'n' for 'ñ'). Temporary plans end with the year (e.g. 'mercado-medieval-alcala-2026').
 - titulo: short and clear. descripcion: 1-3 sentences in your own words (no copied text), useful for parents (what kids do, tips).
 - tipo: 'temporal' (needs fecha_inicio and fecha_fin, YYYY-MM-DD, fecha_fin >= fecha_inicio) or 'permanente' (fechas null).
-- categoria: EXACTLY one of granja, zoo, restaurante, parque, naturaleza, museo, cubierto, espectaculo, fiesta, feria, taller, evento.
+- categoria: EXACTLY one of granja, zoo, restaurante, parque, naturaleza, museo, cubierto, espectaculo, fiesta, feria, taller, evento, ruta.
+- carrito (only for categoria 'ruta', otherwise null): 'si' = normal pushchair OK (asphalt, paved or firm flat track); 'dificil' = only all-terrain pushchair / tricky stretches (dirt, gravel, slopes); 'no' = no pushchair, baby carrier (narrow path, rocks, steps). Set it only when a source describes the surface.
+- distancia_km (only for 'ruta', otherwise null): total walking distance in km (round trip or loop).
 - dias_semana: int array of the weekdays it is available (1=Monday ... 7=Sunday), or null if every day of its date range. Public holidays are treated by the app as Sunday.
 - horario: free text (e.g. 'Sábados y domingos 11:00-14:00'). precio: free text ('Gratis', '5 €', 'Consultar'). gratis: true only if free.
 - edad_min / edad_max: integers 0-12 (use 12 when there is no upper limit).
@@ -38,10 +40,10 @@ STEP 4 — Field rules for every row
 
 STEP 5 — Save
 - Upsert in one or a few statements with execute_sql:
-  insert into public.pf_planes (slug, titulo, descripcion, tipo, categoria, fecha_inicio, fecha_fin, dias_semana, horario, edad_min, edad_max, entorno, precio, gratis, municipio, direccion, lat, lng, url, fuente, ubicacion_aprox, reserva) values (...), (...)
-  on conflict (slug) do update set titulo = excluded.titulo, descripcion = excluded.descripcion, tipo = excluded.tipo, categoria = excluded.categoria, fecha_inicio = excluded.fecha_inicio, fecha_fin = excluded.fecha_fin, dias_semana = excluded.dias_semana, horario = excluded.horario, edad_min = excluded.edad_min, edad_max = excluded.edad_max, entorno = excluded.entorno, precio = excluded.precio, gratis = excluded.gratis, municipio = excluded.municipio, direccion = excluded.direccion, lat = excluded.lat, lng = excluded.lng, url = excluded.url, fuente = excluded.fuente, ubicacion_aprox = excluded.ubicacion_aprox, reserva = excluded.reserva, activo = true, actualizado = now();
+  insert into public.pf_planes (slug, titulo, descripcion, tipo, categoria, fecha_inicio, fecha_fin, dias_semana, horario, edad_min, edad_max, entorno, precio, gratis, municipio, direccion, lat, lng, url, fuente, ubicacion_aprox, reserva, carrito, distancia_km) values (...), (...)
+  on conflict (slug) do update set titulo = excluded.titulo, descripcion = excluded.descripcion, tipo = excluded.tipo, categoria = excluded.categoria, fecha_inicio = excluded.fecha_inicio, fecha_fin = excluded.fecha_fin, dias_semana = excluded.dias_semana, horario = excluded.horario, edad_min = excluded.edad_min, edad_max = excluded.edad_max, entorno = excluded.entorno, precio = excluded.precio, gratis = excluded.gratis, municipio = excluded.municipio, direccion = excluded.direccion, lat = excluded.lat, lng = excluded.lng, url = excluded.url, fuente = excluded.fuente, ubicacion_aprox = excluded.ubicacion_aprox, reserva = excluded.reserva, carrito = excluded.carrito, distancia_km = excluded.distancia_km, activo = true, actualizado = now();
   Escape single quotes by doubling them. Write int arrays as array[6,7]::int[] and nulls as null.
-- The table has check constraints (allowed categories, edad_min <= edad_max, weekdays 1-7, url format, coordinates inside central Spain, slug format). If an insert fails with a constraint error, fix that row and retry; never drop a whole batch because of one row.
+- The table has check constraints (allowed categories, carrito values, distancia_km 0-50, edad_min <= edad_max, weekdays 1-7, url format, coordinates inside central Spain, slug format). If an insert fails with a constraint error, fix that row and retry; never drop a whole batch because of one row.
 - Do not delete rows. Past temporary plans are hidden automatically by the app.
 - Verify: select tipo, count(*) from public.pf_planes where activo and (tipo = 'permanente' or fecha_fin >= 'D') group by tipo; and select slug, fecha_inicio, fecha_fin from public.pf_planes where tipo = 'temporal' and fecha_fin >= 'D' order by fecha_inicio;
 

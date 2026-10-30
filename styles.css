@@ -331,3 +331,6 @@ main { max-width: 720px; margin: 0 auto; padding: 0 16px; }
   .day-name { font-size: 28px; }
   .age small { font-size: 9px; }
 }
+.tag.stroller.si { background: var(--park-tint); color: var(--park-deep); }
+.tag.stroller.dificil { background: var(--slide-tint); color: var(--slide-ink); }
+.tag.stroller.no { background: #FBE6E2; color: var(--danger); }

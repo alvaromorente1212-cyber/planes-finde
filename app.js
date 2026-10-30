@@ -56,15 +56,26 @@
     feria: { e: "🏰", n: "Feria y mercado" },
     taller: { e: "✂️", n: "Taller" },
     evento: { e: "🎪", n: "Evento" },
+    ruta: { e: "🥾", n: "Ruta y paseo" },
     otros: { e: "📍", n: "Plan" },
   };
   const cat = (p) => CAT[p.categoria] || CAT.otros;
+  const isRuta = (p) => p.categoria === "ruta";
+  const CARRITO = {
+    si: { tag: "Con carrito", txt: "Se puede hacer con carrito normal" },
+    dificil: { tag: "Carrito todoterreno", txt: "Solo con carrito de ruedas grandes o todoterreno; algún tramo complicado" },
+    no: { tag: "Sin carrito", txt: "Sin carrito: mejor mochila portabebés o peques que ya caminen" },
+  };
+  const kmTxt = (n) => `${String(Number(n)).replace(".", ",")} km`;
 
   const FILTERS = [
     { id: "gratis", label: "Gratis", test: (p) => p.gratis },
     { id: "cubierto", label: "A cubierto", test: (p) => p.entorno !== "exterior" },
     { id: "animales", label: "Con animales", test: (p) => ["granja", "zoo"].includes(p.categoria) || /granja|animal/i.test(p.descripcion || "") },
     { id: "comer", label: "Para comer", test: (p) => p.categoria === "restaurante" },
+    { id: "rutas", label: "Rutas y paseos", test: (p) => isRuta(p) },
+    { id: "carrito", label: "Con carrito", test: (p) => p.carrito === "si" },
+    { id: "sincarrito", label: "Sin carrito", test: (p) => p.carrito === "no" },
     { id: "cerca", label: "A menos de 25 km", test: (p) => p._km != null && p._km <= 25 },
     { id: "opiniones", label: "Con opiniones", test: (p) => (state.revByPlan[p.id] || []).length > 0 },
   ];
@@ -85,6 +96,7 @@
     tab: "planes",
     mapMode: "dia",
     showAllPerm: false,
+    showAllRutas: false,
     feedPerson: null,
     loaded: false,
   };
@@ -333,7 +345,9 @@
       whenTag(p, k),
       p.gratis ? `<span class="tag free">Gratis</span>` : "",
       rainy ? `<span class="tag rain">Al aire libre</span>` : p.entorno === "interior" ? `<span class="tag">A cubierto</span>` : "",
-      `<span class="tag">${ageShort(p)}</span>`,
+      p.carrito ? `<span class="tag stroller ${p.carrito}">${CARRITO[p.carrito].tag}</span>` : "",
+      p.distancia_km ? `<span class="tag">${kmTxt(p.distancia_km)}</span>` : "",
+      isRuta(p) ? "" : `<span class="tag">${ageShort(p)}</span>`,
       p.reserva ? `<span class="tag warn">Reserva</span>` : "",
     ].join("");
     return `<button type="button" class="card ${p.tipo}" data-plan="${p.id}">
@@ -351,9 +365,11 @@
     const k = state.date;
     const all = plansFor(k);
     const temp = sortPlans(all.filter((p) => p.tipo === "temporal"), k);
-    const perm = sortPlans(all.filter((p) => p.tipo === "permanente"), k);
+    const perm = sortPlans(all.filter((p) => p.tipo === "permanente" && !isRuta(p)), k);
+    const rutas = sortPlans(all.filter((p) => p.tipo === "permanente" && isRuta(p)), k);
     const LIMIT = 10;
     const permShown = state.showAllPerm ? perm : perm.slice(0, LIMIT);
+    const rutasShown = state.showAllRutas ? rutas : rutas.slice(0, LIMIT);
     const noMatch = `<div class="empty"><strong>Nada con estos filtros</strong>Prueba a quitar algún filtro o a cambiar de edad.</div>`;
     $("#lists").innerHTML = `
       <div class="list-head"><h2>Solo estos días</h2><span class="count">${temp.length}</span></div>
@@ -362,7 +378,11 @@
       <div class="list-head"><h2>Cualquier finde</h2><span class="count">${perm.length}</span></div>
       <p class="list-sub">Granjas, parques, museos y sitios para comer que están siempre.</p>
       <div class="cards">${perm.length ? permShown.map((p) => card(p, k)).join("") : noMatch}</div>
-      ${perm.length > LIMIT && !state.showAllPerm ? `<button type="button" class="btn more-btn" data-more>Ver ${perm.length - LIMIT} más</button>` : ""}
+      ${perm.length > LIMIT && !state.showAllPerm ? `<button type="button" class="btn more-btn" data-more="perm">Ver ${perm.length - LIMIT} más</button>` : ""}
+      <div class="list-head"><h2>Rutas y paseos</h2><span class="count">${rutas.length}</span></div>
+      <p class="list-sub">Con carrito, con carrito todoterreno o con mochila. Usa los filtros de arriba para ver solo las de carrito.</p>
+      <div class="cards">${rutas.length ? rutasShown.map((p) => card(p, k)).join("") : noMatch}</div>
+      ${rutas.length > LIMIT && !state.showAllRutas ? `<button type="button" class="btn more-btn" data-more="rutas">Ver ${rutas.length - LIMIT} más</button>` : ""}
       <p class="stale">Los horarios y precios pueden cambiar: confirma en la web antes de ir.</p>`;
   }
 
@@ -464,6 +484,8 @@
         <div class="fact"><span>👶</span><span>${ageTxt}</span></div>
         <div class="fact"><span>💶</span><span>${esc(p.precio || (p.gratis ? "Gratis" : "Consultar"))}</span></div>
         <div class="fact"><span>${p.entorno === "exterior" ? "🌤️" : "🏠"}</span><span>${env}</span></div>
+        ${p.carrito ? `<div class="fact"><span>${p.carrito === "no" ? "🎒" : "🚼"}</span><span>${CARRITO[p.carrito].txt}</span></div>` : ""}
+        ${p.distancia_km ? `<div class="fact"><span>🥾</span><span>Recorrido de ${kmTxt(p.distancia_km)}</span></div>` : ""}
         ${p.reserva ? `<div class="fact"><span>🎟️</span><span>Hay que reservar antes</span></div>` : ""}
         ${p.direccion ? `<div class="fact"><span>📍</span><span>${esc(p.direccion)}${p.ubicacion_aprox ? `<br><small>En el mapa la ubicación es aproximada</small>` : ""}</span></div>` : ""}
         ${a != null ? `<div class="fact"><span>⭐</span><span><strong>${a}</strong> de media con ${revs.length} ${revs.length === 1 ? "opinión" : "opiniones"} del grupo</span></div>` : ""}
@@ -679,11 +701,11 @@
       const a = Number(t.dataset.age);
       state.ages = state.ages.includes(a) ? state.ages.filter((x) => x !== a) : [...state.ages, a];
       store.set("pf_ages", state.ages);
-      state.showAllPerm = false;
+      state.showAllPerm = false; state.showAllRutas = false;
       renderPlanes();
     } else if (t.dataset.date) {
       state.date = t.dataset.date;
-      state.showAllPerm = false;
+      state.showAllPerm = false; state.showAllRutas = false;
       renderCalendar(); renderDayHead(); renderLists();
       $("#dayHead").scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
     } else if (t.dataset.cal) {
@@ -694,7 +716,8 @@
       state.filters.has(f) ? state.filters.delete(f) : state.filters.add(f);
       renderFilters(); renderLists();
     } else if (t.dataset.more !== undefined) {
-      state.showAllPerm = true; renderLists();
+      if (t.dataset.more === "rutas") state.showAllRutas = true; else state.showAllPerm = true;
+      renderLists();
     } else if (t.dataset.plan && !t.closest("form")) {
       openPlan(t.dataset.plan);
     } else if (t.dataset.tab) {
