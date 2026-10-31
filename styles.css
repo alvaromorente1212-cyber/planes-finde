@@ -338,3 +338,6 @@ main { max-width: 720px; margin: 0 auto; padding: 0 16px; }
 .map-ages { margin-top: 10px; }
 .map-ages .age { min-width: 46px; padding: 6px 4px; }
 .map-filters { padding-top: 6px; padding-bottom: 10px; }
+.map-cats-title { font-size: 12px; font-weight: 700; color: var(--ink-soft); margin: 2px 0 0; }
+.map-cats { padding-top: 6px; padding-bottom: 10px; }
+.map-cats .chip { padding: 6px 12px; font-size: 13px; }

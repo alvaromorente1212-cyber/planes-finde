@@ -16,7 +16,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="vendor/leaflet/leaflet.css">
   <link rel="stylesheet" href="vendor/leaflet/MarkerCluster.css">
-  <link rel="stylesheet" href="styles.css?v=7">
+  <link rel="stylesheet" href="styles.css?v=8">
 </head>
 <body>
   <header class="top">
@@ -59,6 +59,8 @@
       </div>
       <div class="ages map-ages" data-ages role="group" aria-label="Edades de los niños en el mapa"></div>
       <div class="filters map-filters" data-filters role="group" aria-label="Filtros del mapa"></div>
+      <p class="map-cats-title">Temáticas en el mapa</p>
+      <div class="filters map-cats" id="mapCats" role="group" aria-label="Temáticas en el mapa"></div>
       <div id="map" role="application" aria-label="Mapa de planes"></div>
       <div class="legend">
         <span><i class="dot dot-temp"></i>Solo estos días</span>
@@ -107,6 +109,6 @@
   <script src="vendor/leaflet/leaflet.js"></script>
   <script src="vendor/leaflet/leaflet.markercluster.js"></script>
   <script src="config.js"></script>
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

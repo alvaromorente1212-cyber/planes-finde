@@ -57,6 +57,7 @@
     taller: { e: "✂️", n: "Taller" },
     evento: { e: "🎪", n: "Evento" },
     ruta: { e: "🥾", n: "Ruta y paseo" },
+    navidad: { e: "🎄", n: "Navidad" },
     otros: { e: "📍", n: "Plan" },
   };
   const cat = (p) => CAT[p.categoria] || CAT.otros;
@@ -82,6 +83,7 @@
     { id: "comer", label: "Para comer", test: (p) => isComer(p) },
     { id: "comerjuego", label: "Comer mientras juegan", test: (p) => !!p.comer_jugando },
     { id: "monitores", label: "Con monitores", test: (p) => p.comer_jugando === "monitores" },
+    { id: "navidad", label: "Navidad", test: (p) => p.categoria === "navidad" },
     { id: "rutas", label: "Rutas y paseos", test: (p) => isRuta(p) },
     { id: "carrito", label: "Con carrito", test: (p) => p.carrito === "si" },
     { id: "sincarrito", label: "Sin carrito", test: (p) => p.carrito === "no" },
@@ -107,6 +109,7 @@
     showAllPerm: false,
     showAllRutas: false,
     showAllComer: false,
+    mapCats: new Set(),
     feedPerson: null,
     loaded: false,
   };
@@ -639,7 +642,9 @@
   function renderMap(focusId) {
     initMap();
     const k = state.date;
-    const list = state.mapMode === "dia" ? plansFor(k) : state.plans.filter((p) => ageOk(p) && filtersOk(p));
+    renderMapCats();
+    const catOk = (p) => !state.mapCats.size || state.mapCats.has(CAT[p.categoria] ? p.categoria : "otros");
+    const list = (state.mapMode === "dia" ? plansFor(k) : state.plans.filter((p) => ageOk(p) && filtersOk(p))).filter(catOk);
     if (focusId && !list.some((p) => p.id === focusId)) {
       const fp = state.plans.find((p) => p.id === focusId);
       if (fp) list.push(fp);
@@ -672,6 +677,14 @@
       if (focusMarker) layer.zoomToShowLayer(focusMarker, () => focusMarker.openPopup());
       else if (bounds.length) map.fitBounds([[CFG.origen.lat, CFG.origen.lng], ...bounds], { padding: [30, 30], maxZoom: 12 });
     }, 50);
+  }
+
+  function renderMapCats() {
+    const present = Object.keys(CAT).filter((c) => state.plans.some((p) => (CAT[p.categoria] ? p.categoria : "otros") === c));
+    $("#mapCats").innerHTML = [
+      `<button type="button" class="chip" data-mapcat="" aria-pressed="${!state.mapCats.size}">Todas</button>`,
+      ...present.map((c) => `<button type="button" class="chip" data-mapcat="${c}" aria-pressed="${state.mapCats.has(c)}">${CAT[c].e} ${CAT[c].n}</button>`),
+    ].join("");
   }
 
   // ---------- Opiniones ----------
@@ -745,6 +758,11 @@
       openPlan(t.dataset.plan);
     } else if (t.dataset.tab) {
       setTab(t.dataset.tab);
+    } else if (t.dataset.mapcat !== undefined) {
+      const c = t.dataset.mapcat;
+      if (!c) state.mapCats.clear();
+      else state.mapCats.has(c) ? state.mapCats.delete(c) : state.mapCats.add(c);
+      renderMap();
     } else if (t.dataset.mapmode) {
       state.mapMode = t.dataset.mapmode;
       document.querySelectorAll("[data-mapmode]").forEach((b) => b.classList.toggle("on", b === t));
